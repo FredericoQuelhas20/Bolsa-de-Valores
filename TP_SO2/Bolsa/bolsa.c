@@ -8,7 +8,7 @@
 #define MAX_EMPRESAS 10
 
 typedef struct {
-    TCHAR nomeEmpresa[256];
+    TCHAR nomeEmpresa[100];
     DWORD numAcoes;
     float valorAcao;
 } InformacaoAcao;
@@ -37,7 +37,7 @@ DWORD WINAPI ThreadAtualizaBolsa(LPVOID param) {
     int contador = 0;
 
     while (!dados->terminar) {
-        strcpy_s(infoAcao.nomeEmpresa, sizeof(infoAcao.nomeEmpresa), "EmpresaX");
+        _tcscpy_s(infoAcao.nomeEmpresa, sizeof(infoAcao.nomeEmpresa), _T("EmpresaX"));
         infoAcao.numAcoes = num_aleatorio(1, 100);
         infoAcao.valorAcao = num_aleatorio(10, 99) + 0.99;
 

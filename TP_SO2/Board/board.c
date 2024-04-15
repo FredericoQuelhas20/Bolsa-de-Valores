@@ -8,7 +8,7 @@
 #define MAX_EMPRESAS 10
 
 typedef struct {
-    TCHAR nomeEmpresa[256];
+    TCHAR nomeEmpresa[100];
     DWORD numAcoes;
     float valorAcao;
 } InformacaoAcao;
@@ -27,14 +27,12 @@ int _tmain(int argc, TCHAR* argv[]) {
     _setmode(_fileno(stdout), _O_WTEXT);
 #endif 
 
-    // Tentar abrir o mapeamento de arquivo existente
     hFileMap = OpenFileMapping(FILE_MAP_READ, FALSE, _T("BolsaMemPartilhada"));
     if (hFileMap == NULL) {
         _tprintf(_T("Erro ao abrir o mapeamento do arquivo: %d\n"), GetLastError());
         return 1;
     }
 
-    // Mapear a vista da memória partilhada
     memPar = (BufferCircular*)MapViewOfFile(hFileMap, FILE_MAP_READ, 0, 0, sizeof(BufferCircular));
     if (memPar == NULL) {
         _tprintf(_T("Erro ao mapear a vista do arquivo: %d\n"), GetLastError());
@@ -42,28 +40,26 @@ int _tmain(int argc, TCHAR* argv[]) {
         return 1;
     }
 
-    // Exibir dados continuamente
     while (TRUE) {
-        system("cls");  // Limpa a tela para uma melhor visualização
+        system("cls");
         _tprintf(_T("Ações Mais Valiosas e Última Transação:\n"));
         _tprintf(_T("-------------------------------------------------------\n"));
 
         for (DWORD i = 0; i < MAX_EMPRESAS; i++) {
-            if (_tcslen(memPar->acoes[i].nomeEmpresa) > 0) {  // Verifica se há dados na posição
-                _tprintf(_T("Empresa: %s, Ações: %d, Valor por Ação: %.2f\n"), memPar->acoes[i].nomeEmpresa, memPar->acoes[i].numAcoes, memPar->acoes[i].valorAcao);
+            if (_tcslen(memPar->acoes[i].nomeEmpresa) > 0) {  
+                _tprintf_s(_T("Empresa: %s, Ações: %d, Valor por Ação: %.2f\n"), memPar->acoes[i].nomeEmpresa, memPar->acoes[i].numAcoes, memPar->acoes[i].valorAcao);
             }
         }
 
         _tprintf(_T("-------------------------------------------------------\n"));
-        _tprintf(_T("Última Transação: %s, Ações: %d, Valor: %.2f\n"),
+        _tprintf_s(_T("Última Transação: %s, Ações: %d, Valor: %.2f\n"),
             memPar->acoes[memPar->indiceUltimaTransacao].nomeEmpresa,
             memPar->acoes[memPar->indiceUltimaTransacao].numAcoes,
             memPar->acoes[memPar->indiceUltimaTransacao].valorAcao);
 
-        Sleep(5000);  // Atualiza a cada 5 segundos
+        Sleep(5000);
     }
 
-    // Limpeza, raramente alcançada devido ao loop infinito
     UnmapViewOfFile(memPar);
     CloseHandle(hFileMap);
 
