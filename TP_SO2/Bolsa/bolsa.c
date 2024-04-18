@@ -1,106 +1,122 @@
 #include <windows.h>
-#include <stdio.h>
 #include <tchar.h>
 #include <math.h>
-#include <fcntl.h>
+#include <stdio.h>
+#include <fcntl.h> 
 #include <io.h>
 
-#define MAX_EMPRESAS 10
+#define MAX_EMPRESAS 30
+#define TAM_STR 100
+#define NOME_SM		    _T("memória")
+#define NOME_MUTEX_IN   _T("mutex_in")
+#define NOME_MUTEX_OUT  _T("mutex_out")
+#define NOME_SEM_L	    _T("sem_livres")
+#define NOME_SEM_O      _T("sem_ocupados")
 
 typedef struct {
-    TCHAR nomeEmpresa[100];
-    DWORD numAcoes;
-    float valorAcao;
-} InformacaoAcao;
+	TCHAR nomeEmp[TAM_STR];
+	DWORD valorAcao;
+	DWORD numAcoes;
+} Empresa;
 
 typedef struct {
-    InformacaoAcao acoes[MAX_EMPRESAS];
-    int indiceUltimaTransacao;
-} BufferCircular;
+	DWORD in, out;
+	Empresa empresas[MAX_EMPRESAS];
+	DWORD indiceUltimaTransacao, numEmpresas;
+} SDATA;
 
 typedef struct {
-    BufferCircular* memPar;
-    HANDLE hSemEscrita;
-    HANDLE hSemLeitura;
-    HANDLE hMutex;
-    int terminar;
-    int id;
-} DadosThreads;
+	BOOL continua;
+	HANDLE hSemL, hMutexIn, hSemO;
+	SDATA* shm;
+} TDATA;
 
-int num_aleatorio(int min, int max) {
-    return rand() % (max - min + 1) + min;
+void geraEmpresa(Empresa* emp) {
+	for (DWORD i = 0; i < MAX_EMPRESAS; i++) {
+		_tcscpy_s(emp[i].nomeEmp, sizeof(emp[i].nomeEmp), _T("EmpresaX"));
+		emp[i].valorAcao = rand() % (99 - 10 + 1) + 10;
+		emp[i].numAcoes = rand() % (99 - 10 + 1) + 10;
+	}
+
 }
 
-DWORD WINAPI ThreadAtualizaBolsa(LPVOID param) {
-    DadosThreads* dados = (DadosThreads*)param;
-    InformacaoAcao infoAcao;
-    int contador = 0;
+DWORD WINAPI comunicacaoBoard(LPVOID data) {
 
-    while (!dados->terminar) {
-        _tcscpy_s(infoAcao.nomeEmpresa, sizeof(infoAcao.nomeEmpresa), _T("EmpresaX"));
-        infoAcao.numAcoes = num_aleatorio(1, 100);
-        infoAcao.valorAcao = num_aleatorio(10, 99) + 0.99;
+	TDATA* td = (TDATA*)data;
+	Empresa emp[MAX_EMPRESAS];
+	DWORD i = 0, pos = 0, contador = 0;
 
-        WaitForSingleObject(dados->hSemEscrita, INFINITE);
-        WaitForSingleObject(dados->hMutex, INFINITE);
+	do {
+		geraEmpresa(emp);
+		WaitForSingleObject(td->hSemL, INFINITE);
+		WaitForSingleObject(td->hMutexIn, INFINITE);
+		CopyMemory(&(td->shm->empresas[td->shm->in]), &emp, sizeof(Empresa) * MAX_EMPRESAS);
+		pos = td->shm->in;
+		td->shm->in = (td->shm->in + 1) % MAX_EMPRESAS;
+		td->shm->indiceUltimaTransacao = (pos + 1) % MAX_EMPRESAS;
+		ReleaseMutex(td->hMutexIn);
+		ReleaseSemaphore(td->hSemO, 1, NULL);
+		contador++;
+		Sleep((rand() % (4 - 2 + 1) + 2) * 1000);
 
-        int pos = dados->memPar->indiceUltimaTransacao;
-        CopyMemory(&dados->memPar->acoes[pos], &infoAcao, sizeof(InformacaoAcao));
-        dados->memPar->indiceUltimaTransacao = (pos + 1) % MAX_EMPRESAS;
+	} while (td->continua);
 
-        ReleaseMutex(dados->hMutex);
-        ReleaseSemaphore(dados->hSemLeitura, 1, NULL);
+	_tprintf(_T("\nA Thread atualizou %d\n"), contador);
 
-        contador++;
-        Sleep(num_aleatorio(1, 5) * 1000);
-    }
-
-    _tprintf(_T("Thread atualizou %d vezes.\n"), contador);
-    return 0;
+	return 0;
 }
 
 int _tmain(int argc, TCHAR* argv[]) {
-    HANDLE hFileMap;
-    HANDLE hThread;
-    DadosThreads dados;
-    BOOL primeiroProcesso = FALSE;
+
+	HANDLE hMap, hThread, hMutexOut;
+	TDATA td;
+	TCHAR str[40];
+	BOOL primeiro = FALSE;
 
 #ifdef UNICODE
-    _setmode(_fileno(stdin), _O_WTEXT);
-    _setmode(_fileno(stdout), _O_WTEXT);
+	_setmode(_fileno(stdin), _O_WTEXT);
+	_setmode(_fileno(stdout), _O_WTEXT);
 #endif 
+	hMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(SDATA), NOME_SM);
+	if (hMap != NULL && GetLastError() != ERROR_ALREADY_EXISTS) {
+		primeiro = TRUE;
+	}
+	td.shm = (SDATA*)MapViewOfFile(hMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+	//INICIAR
+	td.hMutexIn = CreateMutex(NULL, FALSE, NOME_MUTEX_IN);
+	hMutexOut = CreateMutex(NULL, FALSE, NOME_MUTEX_OUT);
+	td.hSemL = CreateSemaphore(NULL, MAX_EMPRESAS, MAX_EMPRESAS, NOME_SEM_L);
+	td.hSemO = CreateSemaphore(NULL, 0, MAX_EMPRESAS, NOME_SEM_O);
 
-    srand((unsigned int)time(NULL));
+	if (primeiro) {
+		WaitForSingleObject(td.hMutexIn, INFINITE);
+		//td.shm->p = 0;
+		td.shm->in = 0;
+		ReleaseMutex(td.hMutexIn);
+		WaitForSingleObject(hMutexOut, INFINITE);
+		//td.shm->c = 0;
+		td.shm->out = 0;
+		ReleaseMutex(hMutexOut);
 
-    dados.hSemEscrita = CreateSemaphore(NULL, MAX_EMPRESAS, MAX_EMPRESAS, _T("BolsaSemEscrita"));
-    dados.hSemLeitura = CreateSemaphore(NULL, 0, MAX_EMPRESAS, _T("BolsaSemLeitura"));
-    dados.hMutex = CreateMutex(NULL, FALSE, _T("BolsaMutex"));
+	}
 
-    hFileMap = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, _T("BolsaMemPartilhada"));
-    if (hFileMap == NULL) {
-        primeiroProcesso = TRUE;
-        hFileMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(BufferCircular), _T("BolsaMemPartilhada"));
-    }
+	WaitForSingleObject(td.hMutexIn, INFINITE);
+	ReleaseMutex(td.hMutexIn);
+	_tprintf(_T("\nBOLSA A COMEÇAR... Escreva 'fim' para terminar...\n"));
+	td.continua = TRUE;
+	hThread = CreateThread(NULL, 0, comunicacaoBoard, &td, 0, NULL);
 
-    dados.memPar = (BufferCircular*)MapViewOfFile(hFileMap, FILE_MAP_ALL_ACCESS, 0, 0, 0);
-
-    if (primeiroProcesso) {
-        ZeroMemory(dados.memPar, sizeof(BufferCircular));
-    }
-
-    dados.terminar = 0;
-    hThread = CreateThread(NULL, 0, ThreadAtualizaBolsa, &dados, 0, NULL);
-
-    _tprintf(_T("Pressione qualquer tecla para terminar...\n"));
-    _gettchar();
-    dados.terminar = 1;
-
-    WaitForSingleObject(hThread, INFINITE);
-    UnmapViewOfFile(dados.memPar);
-    CloseHandle(hFileMap);
-    CloseHandle(dados.hSemEscrita);
-    CloseHandle(dados.hSemLeitura);
-    CloseHandle(dados.hMutex);
-
-    return 0;
+	do {
+		_tscanf_s(_T("%s"), str, 40 - 1);
+	} while (_tcscmp(str, _T("fim")) != 0);
+	td.continua = FALSE;
+	_tprintf(_T("\nBolsa fechando...\n"));
+	WaitForSingleObject(hThread, INFINITE);
+	CloseHandle(td.hSemO);
+	CloseHandle(td.hSemL);
+	CloseHandle(td.hMutexIn);
+	CloseHandle(hMutexOut);
+	UnmapViewOfFile(td.shm);
+	CloseHandle(hMap);
+	return 0;
 }
