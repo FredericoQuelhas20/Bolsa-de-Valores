@@ -14,10 +14,22 @@
 #define NOME_SEM_O      _T("sem_ocupados")
 
 typedef struct {
+	Empresa emp[MAX_EMPRESAS];
+} CarteiraAcoes;
+
+
+typedef struct {
 	TCHAR nomeEmp[TAM_STR];
 	DWORD valorAcao;
 	DWORD numAcoes;
 } Empresa;
+
+typedef struct {
+	TCHAR userName[TAM_STR];
+	DWORD saldo;
+	TCHAR password[TAM_STR];
+	CarteiraAcoes carteira;
+} Cliente;
 
 typedef struct {
 	DWORD in, out;
@@ -39,6 +51,38 @@ void geraEmpresa(Empresa* emp) {
 	}
 
 }
+
+void addc(Empresa* emp, DWORD numEmpresas, TCHAR* nomeEmpresa, DWORD precoAcao, DWORD numAcoes) {
+	_tcscpy_s(emp[numEmpresas++].nomeEmp, sizeof(emp[numEmpresas++].nomeEmp), nomeEmpresa);
+	emp[numEmpresas++].numAcoes = numAcoes;
+	emp[numEmpresas++].valorAcao = precoAcao;
+}
+
+void listc(Empresa* emp) {
+	_tprintf(_T("\nLista de Empresas Registadas:\n"));
+	for (DWORD i = 0; i < MAX_EMPRESAS; i++) {
+			_tprintf_s(_T("Empresa: %s, Ações: %d, Valor por Ação: %i\n"), td->shm->empresas[i].nomeEmp, td->shm->empresas[i].numAcoes, td->shm->empresas[i].valorAcao);
+	}
+}
+
+void stock(Empresa* emp, TCHAR* nomeEmpresa, DWORD precoAcao) {
+	for (DWORD i = 0; i < MAX_EMPRESAS; i++) {
+		if (_tcscmp_s(emp[i].nomeEmp, sizeof(emp[i].nomeEmp), nomeEmpresa) == 0) {
+			emp[i].valorAcao = precoAcao;
+			_tprintf(_T("Valor alterado com sucesso! Empresa: %s Valor (autualizado): %i"), emp[i].nomeEmp, emp[i].valorAcao);
+		}
+	}
+}
+
+void users() {
+	_tprintf(_T("Função ainda não implementada!"));
+}
+
+void pause() {
+	_tprintf(_T("Função ainda não implementada!"));
+}
+
+//COMANDO CLOSE
 
 DWORD WINAPI comunicacaoBoard(LPVOID data) {
 
@@ -77,6 +121,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	_setmode(_fileno(stdin), _O_WTEXT);
 	_setmode(_fileno(stdout), _O_WTEXT);
 #endif 
+
 	hMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(SDATA), NOME_SM);
 	if (hMap != NULL && GetLastError() != ERROR_ALREADY_EXISTS) {
 		primeiro = TRUE;
