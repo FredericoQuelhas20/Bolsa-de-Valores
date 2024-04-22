@@ -1,0 +1,10 @@
+metromondego 1000 0.01
+spaceY 200 500
+compal 300 30
+empresax 400 50
+worten 500 0.50
+auchan 1500 1.30
+xpto 350 4.30
+zxcv 900 5
+emp123 4000 2
+dez12 40 24.50

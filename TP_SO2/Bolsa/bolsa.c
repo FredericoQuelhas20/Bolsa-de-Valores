@@ -14,20 +14,21 @@
 #define NOME_SEM_O      _T("sem_ocupados")
 
 typedef struct {
-	Empresa emp[MAX_EMPRESAS];
-} CarteiraAcoes;
-
-
-typedef struct {
 	TCHAR nomeEmp[TAM_STR];
 	DWORD valorAcao;
 	DWORD numAcoes;
 } Empresa;
 
 typedef struct {
+	Empresa emp[MAX_EMPRESAS];
+} CarteiraAcoes;
+
+
+typedef struct {
 	TCHAR userName[TAM_STR];
 	DWORD saldo;
 	TCHAR password[TAM_STR];
+	BOOL estado; //flag para ver se está ativo ou não
 	CarteiraAcoes carteira;
 } Cliente;
 
@@ -61,21 +62,30 @@ void addc(Empresa* emp, DWORD numEmpresas, TCHAR* nomeEmpresa, DWORD precoAcao, 
 void listc(Empresa* emp) {
 	_tprintf(_T("\nLista de Empresas Registadas:\n"));
 	for (DWORD i = 0; i < MAX_EMPRESAS; i++) {
-			_tprintf_s(_T("Empresa: %s, Ações: %d, Valor por Ação: %i\n"), td->shm->empresas[i].nomeEmp, td->shm->empresas[i].numAcoes, td->shm->empresas[i].valorAcao);
+			_tprintf_s(_T("Empresa: %s, Ações: %d, Valor por Ação: %i\n"), emp[i].nomeEmp, emp[i].numAcoes, emp[i].valorAcao);
 	}
 }
 
-void stock(Empresa* emp, TCHAR* nomeEmpresa, DWORD precoAcao) {
-	for (DWORD i = 0; i < MAX_EMPRESAS; i++) {
-		if (_tcscmp_s(emp[i].nomeEmp, sizeof(emp[i].nomeEmp), nomeEmpresa) == 0) {
-			emp[i].valorAcao = precoAcao;
-			_tprintf(_T("Valor alterado com sucesso! Empresa: %s Valor (autualizado): %i"), emp[i].nomeEmp, emp[i].valorAcao);
+//void stock(Empresa* emp, TCHAR* nomeEmpresa, DWORD precoAcao) {
+//	for (DWORD i = 0; i < MAX_EMPRESAS; i++) {
+//		if (_tcscmp_s(emp[i].nomeEmp, nomeEmpresa) == 0) {
+//			emp[i].valorAcao = precoAcao;
+//			_tprintf(_T("Valor alterado com sucesso! Empresa: %s Valor (autualizado): %i"), emp[i].nomeEmp, emp[i].valorAcao);
+//		}
+//	}
+//}
+
+void users(Cliente* cli, DWORD numCli) {
+	//_tprintf(_T("Função ainda não implementada!"));
+	_tprintf(_T("Lista de Utilizadores: \n"));
+	for (DWORD i = 0; i < numCli; i++)
+	{
+		if (cli[i].estado == TRUE) {
+			_tprintf(_T("User: %s, Saldo: %i, Online?: Ativo"), cli[i].userName, cli[i].saldo);
 		}
+		_tprintf(_T("User: %s, Saldo: %i, Online?: Inativo"), cli[i].userName, cli[i].saldo);
+		
 	}
-}
-
-void users() {
-	_tprintf(_T("Função ainda não implementada!"));
 }
 
 void pause() {
@@ -135,11 +145,9 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 	if (primeiro) {
 		WaitForSingleObject(td.hMutexIn, INFINITE);
-		//td.shm->p = 0;
 		td.shm->in = 0;
 		ReleaseMutex(td.hMutexIn);
 		WaitForSingleObject(hMutexOut, INFINITE);
-		//td.shm->c = 0;
 		td.shm->out = 0;
 		ReleaseMutex(hMutexOut);
 
@@ -147,13 +155,13 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 	WaitForSingleObject(td.hMutexIn, INFINITE);
 	ReleaseMutex(td.hMutexIn);
-	_tprintf(_T("\nBOLSA A COMEÇAR... Escreva 'fim' para terminar...\n"));
+	_tprintf(_T("\nBOLSA A COMEÇAR... Escreva 'close' para terminar...\n"));
 	td.continua = TRUE;
 	hThread = CreateThread(NULL, 0, comunicacaoBoard, &td, 0, NULL);
 
 	do {
 		_tscanf_s(_T("%s"), str, 40 - 1);
-	} while (_tcscmp(str, _T("fim")) != 0);
+	} while (_tcscmp(str, _T("close")) != 0);
 	td.continua = FALSE;
 	_tprintf(_T("\nBolsa fechando...\n"));
 	WaitForSingleObject(hThread, INFINITE);
