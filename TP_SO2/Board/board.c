@@ -8,6 +8,7 @@
 #define TAM 30
 #define TAM_STR 100
 #define MAX_EMPRESA 30
+#define NEMPRESAS_DISPLAY 10
 #define NOME_SM		    _T("memória")
 #define NOME_MUTEX_IN   _T("mutex_in")
 #define NOME_MUTEX_OUT  _T("mutex_out")
@@ -29,51 +30,57 @@ typedef struct {
 typedef struct {
 	BOOL continua;
 	DWORD nDisplayEmp;
-	HANDLE hSemL, hMutexOut, hSemO;
+	HANDLE hMutex, hEv;
 	SDATA* shm;
 } TDATA;
 
 DWORD WINAPI atualizaTopEmpresas(LPVOID data) {
 
 	TDATA* td = (TDATA*)data;
-	Empresa emp[MAX_EMPRESA];
+	//Empresa emp[MAX_EMPRESA];
 	DWORD i = 0, pos = 0;
-
+	HANDLE hEv = OpenEvent(EVENT_MODIFY_STATE, FALSE, _T("Event"));
+	HANDLE hMutex = OpenMutex(SYNCHRONIZE, FALSE, _T("Mutex"));
+	Empresa* pEmpresas;
 	do {
-		WaitForSingleObject(td->hSemO, INFINITE);
-		WaitForSingleObject(td->hMutexOut, INFINITE);
-		CopyMemory(&emp, &(td->shm->empresas[td->shm->out]), sizeof(Empresa) * MAX_EMPRESA);
-		pos = td->shm->out;
-		td->shm->out = (td->shm->out + 1) % TAM;
-		ReleaseMutex(td->hMutexOut);
-		ReleaseSemaphore(td->hSemL, 1, NULL);
+
+		WaitForSingleObject(hEv, INFINITE);
+		WaitForSingleObject(hMutex, INFINITE);
+
+		HANDLE hMap = OpenFileMapping(FILE_MAP_WRITE, FALSE, _T("Empresa"));
+		pEmpresas = (Empresa*)MapViewOfFile(hMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, sizeof(Empresa) * NEMPRESAS_DISPLAY);
 
 		system("cls");
 		_tprintf(_T("Ações Mais Valiosas e Última Transação:\n"));
 		_tprintf(_T("-------------------------------------------------------\n"));
 
 		for (DWORD i = 0; i < td->nDisplayEmp; i++) {
-			if (_tcslen(td->shm->empresas[i].nomeEmp) > 0) {
-				_tprintf_s(_T("Empresa: %s, Ações: %d, Valor por Ação: %i\n"), td->shm->empresas[i].nomeEmp, td->shm->empresas[i].numAcoes, td->shm->empresas[i].valorAcao);
+			if (_tcslen(pEmpresas[i].nomeEmp) > 0) {
+				_tprintf_s(_T("Empresa: %s, Ações: %d, Valor por Ação: %i\n"), pEmpresas[i].nomeEmp, pEmpresas[i].numAcoes, pEmpresas[i].valorAcao);
 			}
 		}
 
-		_tprintf(_T("-------------------------------------------------------\n"));
-		_tprintf_s(_T("Última Transação: %s, Ações: %d, Valor: %i\n"),
-			td->shm->empresas[td->shm->indiceUltimaTransacao].nomeEmp,
-			td->shm->empresas[td->shm->indiceUltimaTransacao].numAcoes,
-			td->shm->empresas[td->shm->indiceUltimaTransacao].valorAcao);
-
-		Sleep((rand() % (4 - 2 + 1) + 2) * 1000);
+		//_tprintf(_T("-------------------------------------------------------\n"));
+		//_tprintf_s(_T("Última Transação: %s, Ações: %d, Valor: %i\n"),
+		//	pEmpresas[td->shm->indiceUltimaTransacao].nomeEmp,
+		//	pEmpresas[td->shm->indiceUltimaTransacao].numAcoes,
+		//	pEmpresas[td->shm->indiceUltimaTransacao].valorAcao);
+		Sleep(2000);
+		UnmapViewOfFile(pEmpresas);
+		ReleaseMutex(hMutex);
+		CloseHandle(hMap);
 
 	} while (td->continua);
+
+	CloseHandle(hEv);
+	CloseHandle(hMutex);
 
 	return 0;
 }
 
 int _tmain(int argc, TCHAR* argv[]) {
 
-	HANDLE hMap, hThread, hMutexIn;
+	HANDLE hMap, hThread, hSem;
 	TDATA td;
 	TCHAR str[40];
 	BOOL primeiro = FALSE;
@@ -91,46 +98,33 @@ int _tmain(int argc, TCHAR* argv[]) {
 		displays = 10;
 	}
 
+	hSem = CreateSemaphore(NULL, MAX_EMPRESA, MAX_EMPRESA, _T("Sem"));
+	//Esperar No semaforo (-1)
+	WaitForSingleObject(hSem, INFINITE);
+
 	hMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(SDATA), NOME_SM);
 	if (hMap != NULL && GetLastError() != ERROR_ALREADY_EXISTS) {
 		primeiro = TRUE;
 	}
 	td.shm = (SDATA*)MapViewOfFile(hMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 	//INICIAR
-	td.hMutexOut = CreateMutex(NULL, FALSE, NOME_MUTEX_IN);
-	hMutexIn = CreateMutex(NULL, FALSE, NOME_MUTEX_OUT);
-	td.hSemL = CreateSemaphore(NULL, TAM, TAM, NOME_SEM_L);
-	td.hSemO = CreateSemaphore(NULL, 0, TAM, NOME_SEM_O);
-
-	if (primeiro) {
-		WaitForSingleObject(hMutexIn, INFINITE);
-		//td.shm->p = 0;
-		td.shm->in = 0;
-		ReleaseMutex(hMutexIn);
-		WaitForSingleObject(td.hMutexOut, INFINITE);
-		//td.shm->c = 0;
-		td.shm->out = 0;
-		ReleaseMutex(td.hMutexOut);
-
-	}
-
-	WaitForSingleObject(td.hMutexOut, INFINITE);
-	ReleaseMutex(td.hMutexOut);
+	td.hMutex = CreateMutex(NULL, FALSE, NOME_MUTEX_IN);
+	td.hEv = CreateEvent(NULL, TRUE, FALSE, _T("Event"));
 	td.nDisplayEmp = displays;
 	td.continua = TRUE;
 	hThread = CreateThread(NULL, 0, atualizaTopEmpresas, &td, 0, NULL);
-
+	_tprintf(_T("Criei a Thread"));
 	do {
 		_tscanf_s(_T("%s"), str, 40 - 1);
+		_tprintf(_T("Estou no loop"));
 	} while (_tcscmp(str, _T("fim")) != 0);
 	td.continua = FALSE;
 	WaitForSingleObject(hThread, INFINITE);
-	CloseHandle(td.hSemO);
-	CloseHandle(td.hSemL);
-	CloseHandle(td.hMutexOut);
-	CloseHandle(hMutexIn);
+	CloseHandle(td.hMutex);
+	CloseHandle(td.hEv);
 	UnmapViewOfFile(td.shm);
 	CloseHandle(hMap);
+	ReleaseSemaphore(hSem, 1, NULL);
 	_tprintf(_T("Board fechando..."));
 	return 0;
 }

@@ -1,4 +1,2 @@
 ﻿  bolsa.c
-C:\Users\frede\OneDrive\Ambiente de Trabalho\SEMESTRE II 2_ano\SO2\TP\TP_SO2\Bolsa\bolsa.c(71,7): warning C4013: '_tcscmp_s' indefinido; assumindo extern retornando int
-bolsa.obj : error LNK2019: símbolo externo não resolvido, _tcscmp_s, referenciado na função stock
-C:\Users\frede\OneDrive\Ambiente de Trabalho\SEMESTRE II 2_ano\SO2\TP\TP_SO2\x64\Debug\Bolsa.exe : fatal error LNK1120: 1 externo não resolvidos
+  Bolsa.vcxproj -> C:\Users\frede\OneDrive\Ambiente de Trabalho\SEMESTRE II 2_ano\SO2\TP\TP_SO2\x64\Debug\Bolsa.exe

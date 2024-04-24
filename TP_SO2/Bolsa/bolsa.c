@@ -6,6 +6,7 @@
 #include <io.h>
 
 #define MAX_EMPRESAS 30
+#define NEMPRESAS_DISPLAY 10
 #define TAM_STR 100
 #define NOME_SM		    _T("memória")
 #define NOME_MUTEX_IN   _T("mutex_in")
@@ -40,7 +41,7 @@ typedef struct {
 
 typedef struct {
 	BOOL continua;
-	HANDLE hSemL, hMutexIn, hSemO;
+	HANDLE hMutex, hEv;
 	SDATA* shm;
 } TDATA;
 
@@ -99,62 +100,53 @@ DWORD WINAPI comunicacaoBoard(LPVOID data) {
 	TDATA* td = (TDATA*)data;
 	Empresa emp[MAX_EMPRESAS];
 	DWORD i = 0, pos = 0, contador = 0;
+	HANDLE hMap;
+	Empresa* pEmpresas;
 
 	do {
 		geraEmpresa(emp);
-		WaitForSingleObject(td->hSemL, INFINITE);
-		WaitForSingleObject(td->hMutexIn, INFINITE);
-		CopyMemory(&(td->shm->empresas[td->shm->in]), &emp, sizeof(Empresa) * MAX_EMPRESAS);
-		pos = td->shm->in;
-		td->shm->in = (td->shm->in + 1) % MAX_EMPRESAS;
-		td->shm->indiceUltimaTransacao = (pos + 1) % MAX_EMPRESAS;
-		ReleaseMutex(td->hMutexIn);
-		ReleaseSemaphore(td->hSemO, 1, NULL);
-		contador++;
-		Sleep((rand() % (4 - 2 + 1) + 2) * 1000);
-
+		WaitForSingleObject(td->hEv, INFINITE);
+		hMap = OpenFileMapping(FILE_MAP_WRITE, FALSE, _T("Empresa"));
+		if (hMap == NULL) {
+			_tprintf(_T("Erro ao abrir FileMapping.\n"));
+			return 1;
+		}
+		pEmpresas = (Empresa*)MapViewOfFile(hMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, sizeof(Empresa) * NEMPRESAS_DISPLAY);
+		if (pEmpresas == NULL) {
+			_tprintf(_T("Erro ao mapear a visão do arquivo.\n"));
+			CloseHandle(hMap);
+			return 1;
+		}
+		WaitForSingleObject(td->hMutex, INFINITE);
+		CopyMemory(pEmpresas, &emp, sizeof(Empresa) * NEMPRESAS_DISPLAY);
+		ReleaseMutex(td->hMutex);
+		UnmapViewOfFile(pEmpresas);
+		Sleep(2000);
 	} while (td->continua);
 
-	_tprintf(_T("\nA Thread atualizou %d\n"), contador);
+	//_tprintf(_T("\nA Thread atualizou %d\n"), contador);
 
 	return 0;
 }
-
 int _tmain(int argc, TCHAR* argv[]) {
 
-	HANDLE hMap, hThread, hMutexOut;
+	HANDLE hMap, hThread;
 	TDATA td;
 	TCHAR str[40];
-	BOOL primeiro = FALSE;
 
 #ifdef UNICODE
 	_setmode(_fileno(stdin), _O_WTEXT);
 	_setmode(_fileno(stdout), _O_WTEXT);
 #endif 
 
-	hMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(SDATA), NOME_SM);
-	if (hMap != NULL && GetLastError() != ERROR_ALREADY_EXISTS) {
-		primeiro = TRUE;
-	}
-	td.shm = (SDATA*)MapViewOfFile(hMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
-	//INICIAR
-	td.hMutexIn = CreateMutex(NULL, FALSE, NOME_MUTEX_IN);
-	hMutexOut = CreateMutex(NULL, FALSE, NOME_MUTEX_OUT);
-	td.hSemL = CreateSemaphore(NULL, MAX_EMPRESAS, MAX_EMPRESAS, NOME_SEM_L);
-	td.hSemO = CreateSemaphore(NULL, 0, MAX_EMPRESAS, NOME_SEM_O);
-
-	if (primeiro) {
-		WaitForSingleObject(td.hMutexIn, INFINITE);
-		td.shm->in = 0;
-		ReleaseMutex(td.hMutexIn);
-		WaitForSingleObject(hMutexOut, INFINITE);
-		td.shm->out = 0;
-		ReleaseMutex(hMutexOut);
-
+	td.hMutex = CreateMutex(NULL, FALSE, NOME_MUTEX_IN);
+	td.hEv = CreateEvent(NULL, TRUE, TRUE, _T("Event"));
+	hMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(Empresa) * NEMPRESAS_DISPLAY, _T("Empresa"));
+	if (hMap == NULL) {
+		_tprintf(_T("Erro ao criar o mapeamento do arquivo.\n"));
+		return 1;
 	}
 
-	WaitForSingleObject(td.hMutexIn, INFINITE);
-	ReleaseMutex(td.hMutexIn);
 	_tprintf(_T("\nBOLSA A COMEÇAR... Escreva 'close' para terminar...\n"));
 	td.continua = TRUE;
 	hThread = CreateThread(NULL, 0, comunicacaoBoard, &td, 0, NULL);
@@ -165,11 +157,8 @@ int _tmain(int argc, TCHAR* argv[]) {
 	td.continua = FALSE;
 	_tprintf(_T("\nBolsa fechando...\n"));
 	WaitForSingleObject(hThread, INFINITE);
-	CloseHandle(td.hSemO);
-	CloseHandle(td.hSemL);
-	CloseHandle(td.hMutexIn);
-	CloseHandle(hMutexOut);
-	UnmapViewOfFile(td.shm);
+	CloseHandle(td.hEv);
+	CloseHandle(td.hMutex);
 	CloseHandle(hMap);
 	return 0;
 }
