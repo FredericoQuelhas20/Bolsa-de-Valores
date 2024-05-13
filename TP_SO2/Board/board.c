@@ -7,7 +7,7 @@
 
 #define TAM 30
 #define TAM_STR 100
-#define MAX_EMPRESA 30
+#define MAX_EMPRESAS 30
 #define NEMPRESAS_DISPLAY 10
 #define NOME_SM		    _T("memória")
 #define NOME_MUTEX_IN   _T("mutex_in")
@@ -22,22 +22,28 @@ typedef struct {
 } Empresa;
 
 typedef struct {
-	DWORD in, out;
-	Empresa empresas[TAM];
-	DWORD indiceUltimaTransacao, numEmpresas;
-} SDATA;
+	Empresa empresas[MAX_EMPRESAS];
+}ArrayEmpresa;
+
+//typedef struct {
+//	DWORD in, out;
+//	Empresa empresas[TAM];
+//	DWORD indiceUltimaTransacao, numEmpresas;
+//} SDATA;
 
 typedef struct {
 	BOOL continua;
 	DWORD nDisplayEmp;
 	HANDLE hMutex, hEv;
-	SDATA* shm;
+	Empresa empresas[MAX_EMPRESAS];
+	//SDATA* shm;
 } TDATA;
 
 DWORD WINAPI atualizaTopEmpresas(LPVOID data) {
 
 	TDATA* td = (TDATA*)data;
 	//Empresa emp[MAX_EMPRESA];
+	//ArrayEmpresa emp;
 	DWORD i = 0, pos = 0;
 	HANDLE hEv = OpenEvent(EVENT_MODIFY_STATE, FALSE, _T("Event"));
 	HANDLE hMutex = OpenMutex(SYNCHRONIZE, FALSE, _T("Mutex"));
@@ -56,7 +62,7 @@ DWORD WINAPI atualizaTopEmpresas(LPVOID data) {
 
 		for (DWORD i = 0; i < td->nDisplayEmp; i++) {
 			if (_tcslen(pEmpresas[i].nomeEmp) > 0) {
-				_tprintf_s(_T("Empresa: %s, Ações: %d, Valor por Ação: %i\n"), pEmpresas[i].nomeEmp, pEmpresas[i].numAcoes, pEmpresas[i].valorAcao);
+				_tprintf_s(_T("Empresa: %s, Ações: %u, Valor por Ação: %u\n"), pEmpresas[i].nomeEmp, pEmpresas[i].numAcoes, pEmpresas[i].valorAcao);
 			}
 		}
 
@@ -82,6 +88,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 
 	HANDLE hMap, hThread, hSem;
 	TDATA td;
+	TDATA* pData;
 	TCHAR str[40];
 	BOOL primeiro = FALSE;
 	DWORD displays = 0;
@@ -98,15 +105,15 @@ int _tmain(int argc, TCHAR* argv[]) {
 		displays = 10;
 	}
 
-	hSem = CreateSemaphore(NULL, MAX_EMPRESA, MAX_EMPRESA, _T("Sem"));
+	hSem = CreateSemaphore(NULL, MAX_EMPRESAS, MAX_EMPRESAS, _T("Sem"));
 	//Esperar No semaforo (-1)
 	WaitForSingleObject(hSem, INFINITE);
 
-	hMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(SDATA), NOME_SM);
+	hMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(TDATA), NOME_SM);
 	if (hMap != NULL && GetLastError() != ERROR_ALREADY_EXISTS) {
 		primeiro = TRUE;
 	}
-	td.shm = (SDATA*)MapViewOfFile(hMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+	pData = (TDATA*)MapViewOfFile(hMap, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
 	//INICIAR
 	td.hMutex = CreateMutex(NULL, FALSE, NOME_MUTEX_IN);
 	td.hEv = CreateEvent(NULL, TRUE, FALSE, _T("Event"));
@@ -122,7 +129,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	WaitForSingleObject(hThread, INFINITE);
 	CloseHandle(td.hMutex);
 	CloseHandle(td.hEv);
-	UnmapViewOfFile(td.shm);
+	UnmapViewOfFile(pData);
 	CloseHandle(hMap);
 	ReleaseSemaphore(hSem, 1, NULL);
 	_tprintf(_T("Board fechando..."));

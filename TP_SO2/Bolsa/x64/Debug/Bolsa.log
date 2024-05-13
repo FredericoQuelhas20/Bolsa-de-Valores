@@ -1,2 +1,8 @@
 ﻿  bolsa.c
+C:\Users\frede\OneDrive\Ambiente de Trabalho\SEMESTRE II 2_ano\SO2\TP\TP_SO2\Bolsa\bolsa.c(54,16): warning C4101: 'empresas': variável local não referenciada
+C:\Users\frede\OneDrive\Ambiente de Trabalho\SEMESTRE II 2_ano\SO2\TP\TP_SO2\Bolsa\bolsa.c(199,25): warning C4047: 'função': 'DWORD *' difere em níveis de indireção de 'DWORD **'
+C:\Users\frede\OneDrive\Ambiente de Trabalho\SEMESTRE II 2_ano\SO2\TP\TP_SO2\Bolsa\bolsa.c(199,25): warning C4024: 'addc': tipos diferentes para parâmetro formal e real 2
+C:\Users\frede\OneDrive\Ambiente de Trabalho\SEMESTRE II 2_ano\SO2\TP\TP_SO2\Bolsa\bolsa.c(207,24): warning C4047: 'função': 'DWORD *' difere em níveis de indireção de 'DWORD **'
+C:\Users\frede\OneDrive\Ambiente de Trabalho\SEMESTRE II 2_ano\SO2\TP\TP_SO2\Bolsa\bolsa.c(207,24): warning C4024: 'listc': tipos diferentes para parâmetro formal e real 2
+C:\Users\frede\OneDrive\Ambiente de Trabalho\SEMESTRE II 2_ano\SO2\TP\TP_SO2\Bolsa\bolsa.c(158,15): warning C4101: 'empArray': variável local não referenciada
   Bolsa.vcxproj -> C:\Users\frede\OneDrive\Ambiente de Trabalho\SEMESTRE II 2_ano\SO2\TP\TP_SO2\x64\Debug\Bolsa.exe
