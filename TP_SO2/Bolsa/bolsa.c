@@ -5,6 +5,9 @@
 #include <fcntl.h> 
 #include <io.h>
 
+#define MAX_USERNAME_LENGTH 50
+#define MAX_PASSWORD_LENGTH 50
+#define MAX_PIPE_BUFFER_SIZE 1024
 #define MAX_EMPRESAS 30
 #define NEMPRESAS_DISPLAY 10
 #define TAM_STR 100
@@ -28,20 +31,34 @@ typedef struct {
 	Empresa emp[MAX_EMPRESAS];
 } CarteiraAcoes;
 
-
 typedef struct {
-	TCHAR userName[TAM_STR];
-	DWORD saldo;
-	TCHAR password[TAM_STR];
-	BOOL estado; //flag para ver se está ativo ou não
+	TCHAR username[MAX_USERNAME_LENGTH];
+	TCHAR password[MAX_PASSWORD_LENGTH];
+	float saldo;
+	BOOL estado;
 	CarteiraAcoes carteira;
 } Cliente;
 
 //typedef struct {
+<<<<<<< HEAD
 //	DWORD in, out;
 //	Empresa empresas[MAX_EMPRESAS];
 //	DWORD indiceUltimaTransacao, numEmpresas;
 //} SDATA;
+=======
+//	TCHAR userName[TAM_STR];
+//	DWORD saldo;
+//	TCHAR password[TAM_STR];
+//	BOOL estado; //flag para ver se está ativo ou não
+//	CarteiraAcoes carteira;
+//} Cliente;
+
+typedef struct {
+	DWORD in, out;
+	Empresa empresas[MAX_EMPRESAS];
+	DWORD indiceUltimaTransacao, numEmpresas;
+} SDATA;
+>>>>>>> ff9a22c8dbb916665f04f4f1a6785a605bd4ba01
 
 typedef struct {
 	BOOL continua;
@@ -90,6 +107,7 @@ void stock(Empresa* emp, TCHAR* nomeEmpresa, DWORD precoAcao) {
 	}
 }
 
+<<<<<<< HEAD
 void users(Cliente* cli, DWORD numCli) {
 	//_tprintf(_T("Função ainda não implementada!"));
 	_tprintf(_T("Lista de Utilizadores: \n"));
@@ -100,7 +118,79 @@ void users(Cliente* cli, DWORD numCli) {
 		}
 		_tprintf(_T("User: %s, Saldo: %i, Online?: Inativo"), cli[i].userName, cli[i].saldo);
 		
+=======
+//void stock(Empresa* emp, TCHAR* nomeEmpresa, DWORD precoAcao) {
+//	for (DWORD i = 0; i < MAX_EMPRESAS; i++) {
+//		if (_tcscmp_s(emp[i].nomeEmp, nomeEmpresa) == 0) {
+//			emp[i].valorAcao = precoAcao;
+//			_tprintf(_T("Valor alterado com sucesso! Empresa: %s Valor (autualizado): %i"), emp[i].nomeEmp, emp[i].valorAcao);
+//		}
+//	}
+//}
+
+//void users(Cliente* cli, DWORD numCli) {
+//	//_tprintf(_T("Função ainda não implementada!"));
+//	_tprintf(_T("Lista de Utilizadores: \n"));
+//	for (DWORD i = 0; i < numCli; i++)
+//	{
+//		if (cli[i].estado == TRUE) {
+//			_tprintf(_T("User: %s, Saldo: %i, Online?: Ativo"), cli[i].userName, cli[i].saldo);
+//		}
+//		_tprintf(_T("User: %s, Saldo: %i, Online?: Inativo"), cli[i].userName, cli[i].saldo);
+//		
+//	}
+//}
+
+void readUserListAndSend(const TCHAR* filename, HANDLE pipeHandle) {
+	HANDLE fileHandle = CreateFile(
+		filename,
+		GENERIC_READ,
+		FILE_SHARE_READ,
+		NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+		NULL);
+
+	if (fileHandle == INVALID_HANDLE_VALUE) {
+		_tprintf(_T("Erro ao abrir o arquivo %s. Código de erro: %d\n"), filename, GetLastError());
+		return;
+>>>>>>> ff9a22c8dbb916665f04f4f1a6785a605bd4ba01
 	}
+
+	Cliente cliente;
+	TCHAR buffer[MAX_PIPE_BUFFER_SIZE];
+	DWORD bytesRead;
+	OVERLAPPED overlapped = { 0 };
+
+	while (ReadFile(fileHandle, &cliente, sizeof(Cliente), &bytesRead, &overlapped) || GetLastError() == ERROR_IO_PENDING) {
+		DWORD bytesWritten;
+
+		// Aguardar a conclusão da operação de leitura
+		WaitForSingleObject(fileHandle, INFINITE);
+
+		if (GetOverlappedResult(fileHandle, &overlapped, &bytesRead, FALSE)) {
+			// Construir a mensagem a ser enviada pelo named pipe
+			_stprintf(buffer, _T("%s %s %.2f %d"), cliente.username, cliente.password, cliente.saldo, cliente.estado);
+
+			// Enviar mensagem pelo named pipe
+			if (!WriteFile(pipeHandle, buffer, _tcslen(buffer) * sizeof(TCHAR), &bytesWritten, NULL)) {
+				_tprintf(_T("Erro ao escrever no named pipe. Código de erro: %d\n"), GetLastError());
+				CloseHandle(fileHandle);
+				return;
+			}
+		}
+		else {
+			_tprintf(_T("Erro ao realizar a operação de leitura. Código de erro: %d\n"), GetLastError());
+			CloseHandle(fileHandle);
+			return;
+		}
+
+		// Limpar a estrutura OVERLAPPED para a próxima operação
+		ZeroMemory(&overlapped, sizeof(OVERLAPPED));
+	}
+
+	// Fechar o arquivo
+	CloseHandle(fileHandle);
 }
 
 void pause() {
@@ -145,8 +235,9 @@ DWORD WINAPI comunicacaoBoard(LPVOID data) {
 }
 int _tmain(int argc, TCHAR* argv[]) {
 
-	HANDLE hMap, hThread;
+	HANDLE hMap, hThread, pipeHandle;
 	TDATA td;
+<<<<<<< HEAD
 	TCHAR inputLine[256];
 	//TCHAR str[40];
 	TCHAR* context = NULL;
@@ -157,11 +248,44 @@ int _tmain(int argc, TCHAR* argv[]) {
 	//Empresa emp[MAX_EMPRESAS];
 	ArrayEmpresa empArray;
 	DWORD* numEmpresas = 0;
+=======
+	TCHAR str[40];
+	const TCHAR* pipeName = _T("\\\\.\\pipe\\UserListPipe");	
+>>>>>>> ff9a22c8dbb916665f04f4f1a6785a605bd4ba01
 
 #ifdef UNICODE
 	_setmode(_fileno(stdin), _O_WTEXT);
 	_setmode(_fileno(stdout), _O_WTEXT);
 #endif 
+
+	// Criar named pipe
+	pipeHandle = CreateNamedPipe(
+		pipeName,
+		PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
+		PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+		1,
+		MAX_PIPE_BUFFER_SIZE,
+		MAX_PIPE_BUFFER_SIZE,
+		0,
+		NULL);
+
+	if (pipeHandle == INVALID_HANDLE_VALUE) {
+		_tprintf(_T("Erro ao criar named pipe. Código de erro: %d\n"), GetLastError());
+		return 1;
+	}
+
+	// Conectar ao cliente
+	if (!ConnectNamedPipe(pipeHandle, NULL)) {
+		_tprintf(_T("Erro ao conectar ao named pipe. Código de erro: %d\n"), GetLastError());
+		CloseHandle(pipeHandle);
+		return 1;
+	}
+
+	// Caminho completo do arquivo de usuários
+	const TCHAR* userlistPath = _T("C:\\Users\\drll_\\source\\repos\\SO2_TP\\TP_SO2\\x64\\Debug\\userlist.txt");
+
+	// Ler o arquivo de usuários e enviar os dados pelo named pipe
+	readUserListAndSend(userlistPath, pipeHandle);	
 
 	td.hMutex = CreateMutex(NULL, FALSE, NOME_MUTEX_IN);
 	td.hEv = CreateEvent(NULL, TRUE, TRUE, _T("Event"));
@@ -210,7 +334,8 @@ int _tmain(int argc, TCHAR* argv[]) {
 	} while (_tcscmp(inputLine, _T("close")) != 0);
 	td.continua = FALSE;
 	_tprintf(_T("\nBolsa fechando...\n"));
-	WaitForSingleObject(hThread, INFINITE);
+	WaitForSingleObject(hThread, INFINITE);	
+	CloseHandle(pipeHandle);
 	CloseHandle(td.hEv);
 	CloseHandle(td.hMutex);
 	CloseHandle(hMap);
