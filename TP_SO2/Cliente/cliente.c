@@ -8,7 +8,7 @@
 #define TAM 200
 #define TAM_STR 20
 #define MAX_UTILIZADORES 20
-#define NOME_SM		    _T("memória")
+#define NOME_SM		    _T("memÃ³ria")
 #define NOME_MUTEX_IN   _T("mutex_in")
 #define NOME_MUTEX_OUT  _T("mutex_out")
 #define NOME_SEM_L	    _T("sem_livres")
@@ -44,7 +44,7 @@ int _tmain(int argc, TCHAR* argv[]) {
 	_setmode(_fileno(stderr), _O_WTEXT);
 #endif
 
-	//Criação ou Abertura do Registry com NCLIENTES
+	//CriaÃ§Ã£o ou Abertura do Registry com NCLIENTES
 	LONG lResult = RegCreateKeyExA(HKEY_CURRENT_USER, "Software\\TPSO2\\NCLIENTES", 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &chave, &queAconteceu);
 
 	if (lResult != ERROR_SUCCESS) { 
